@@ -11,10 +11,8 @@ app=$YNH_APP_INSTANCE_NAME
 # Construct full email
 email="${local_part}@${domain}"
 
-# Check if email already exists in Postfix
-if postmap -q "$email" /etc/postfix/virtual >/dev/null; then
-    ynh_die "The email address $email is already in use in Postfix."
-fi
+# Generate random password for the mailbox
+imap_password=$(ynh_string_random --length=32)
 
 # Validate webhook reachability
 webhook_check_url="$webhook_url"
@@ -39,16 +37,26 @@ ynh_app_setting_set $app local_part "$local_part"
 ynh_app_setting_set $app webhook_url "$webhook_url"
 ynh_app_setting_set $app api_secret "$api_secret"
 ynh_app_setting_set $app parse_attachments "$parse_attachments"
+ynh_app_setting_set $app imap_password "$imap_password"
 
-install_dir="/opt/$app"
-mkdir -p "$install_dir"/{data,logs}
-
-# Copy parse_mail.py from packaging directory
-cp "../conf/parse_mail.py" "$install_dir/parse_mail.py"
-chmod +x "$install_dir/parse_mail.py"
-
+# Create YunoHost user for email receiving
+ynh_print_info "Creating email user..."
+yunohost user create "$local_part" \
+    --firstname "Kaburu" \
+    --lastname "Webhook" \
+    --mail "$email" \
 # Generate config.json for the python script
-# parse_attachments is 0 or 1 from YunoHost
+cat > "$install_dir/config.json" <<JSON
+{
+  "domain": "$domain",
+  "local_part": "$local_part",
+  "webhook_url": "$webhook_url",
+  "api_secret": "$api_secret",
+  "parse_attachments": $parse_attachments,
+  "imap_password": "$imap_password"
+}
+JSON
+chmod 600 "$install_dir/config.json"unoHost
 cat > "$install_dir/config.json" <<JSON
 {
   "domain": "$domain",
@@ -62,24 +70,14 @@ chmod 600 "$install_dir/config.json"
 
 chown -R $app:$app "$install_dir"
 
-# --- Postfix Integration ---
+# --- Cron Job Setup ---
+ynh_print_info "Setting up cron job to check emails..."
 
-# 1. Add virtual alias
-ynh_print_info "Configuring Postfix..."
-echo "$email  ${app}-pipe" >> /etc/postfix/virtual
-
-# 2. Add pipe service to master.cf if not present
-if ! grep -q "^${app}-pipe unix" /etc/postfix/master.cf; then
-    cat >> /etc/postfix/master.cf <<POSTFIX_EOF
-
-# Kaburu email webhook pipe
-${app}-pipe unix - n n - - pipe
-  flags=Rq user=$app argv=$install_dir/parse_mail.py
-POSTFIX_EOF
-fi
-
-# 3. Apply changes
-postmap /etc/postfix/virtual
-systemctl reload postfix
+# Create cron job to check emails every minute
+cat > "/etc/cron.d/${app}" <<CRON
+# Check for new emails and forward to webhook
+* * * * * $app $install_dir/parse_mail.py >> $install_dir/logs/cron.log 2>&1
+CRON
 
 ynh_print_info "Installation complete! Email: $email -> Webhook: $webhook_url"
+ynh_print_info "Emails will be checked every minute and forwarded to your webhook."

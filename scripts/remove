@@ -4,15 +4,16 @@ set -e
 source /usr/share/yunohost/helpers
 
 app=$YNH_APP_INSTANCE_NAME
+local_part=$(ynh_app_setting_get $app local_part)
 
-# Remove from virtual (suppress error if not found)
-sed -i "/\s${app}-pipe$/d" /etc/postfix/virtual || true
+# Remove cron job
+rm -f "/etc/cron.d/${app}"
 
-# Remove from master.cf (suppress error if not found)
-sed -i "/^${app}-pipe .*/,+1d" /etc/postfix/master.cf || true
+# Delete YunoHost user
+if yunohost user list --output-as json | jq -e ".users.\"$local_part\"" >/dev/null 2>&1; then
+    yunohost user delete "$local_part" || true
+fi
 
-postmap /etc/postfix/virtual
-systemctl reload postfix
-
+# Delete system user and files
 ynh_system_user_delete $app || true
 rm -rf /opt/$app
