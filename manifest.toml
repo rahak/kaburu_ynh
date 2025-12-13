@@ -9,7 +9,7 @@ maintainers = ["rahak"]
 
 [upstream]
 license = "free"
-code = "https://github.com/rahak/kaburu.git"
+code = "https://github.com/rahak/kaburu_ynh"
 
 [install]
 domain = { type = "domain" }
