@@ -1,0 +1,81 @@
+#!/bin/bash
+set -e
+
+# Load YunoHost helper
+source /usr/share/yunohost/helpers
+
+app=$YNH_APP_INSTANCE_NAME
+
+# --- Validation ---
+
+# Construct full email
+email="${local_part}@${domain}"
+
+# Check if email already exists in Postfix
+if postmap -q "$email" /etc/postfix/virtual >/dev/null; then
+    ynh_die "The email address $email is already in use in Postfix."
+fi
+
+# Validate webhook reachability
+webhook_check_url="$webhook_url"
+if [[ "$webhook_url" =~ ^/ ]]; then
+    webhook_check_url="http://127.0.0.1$webhook_url"
+fi
+
+ynh_print_info "Validating webhook reachability..."
+if ! curl -s -o /dev/null --max-time 5 "$webhook_check_url"; then
+    ynh_print_warn "Could not reach webhook at $webhook_check_url. Please verify the URL."
+fi
+
+# --- Dependencies ---
+ynh_install_app_dependencies python3-requests
+
+# --- Install ---
+
+ynh_system_user_create --username=$app --home_dir="/opt/$app"
+
+ynh_app_setting_set $app domain "$domain"
+ynh_app_setting_set $app local_part "$local_part"
+ynh_app_setting_set $app webhook_url "$webhook_url"
+ynh_app_setting_set $app api_secret "$api_secret"
+ynh_app_setting_set $app parse_attachments "$parse_attachments"
+
+install_dir="/opt/$app"
+mkdir -p "$install_dir"/{data,logs}
+
+# Copy parse_mail.py from packaging directory
+cp "../conf/parse_mail.py" "$install_dir/parse_mail.py"
+chmod +x "$install_dir/parse_mail.py"
+
+# Generate config.json for the python script
+# parse_attachments is 0 or 1 from YunoHost
+cat > "$install_dir/config.json" <<JSON
+{
+  "domain": "$domain",
+  "local_part": "$local_part",
+  "webhook_url": "$webhook_url",
+  "api_secret": "$api_secret",
+  "parse_attachments": $parse_attachments
+}
+JSON
+chmod 600 "$install_dir/config.json"
+
+chown -R $app:$app "$install_dir"
+
+# --- Postfix Integration ---
+
+# 1. Add virtual alias
+ynh_print_info "Configuring Postfix..."
+echo "$email  ${app}-pipe" >> /etc/postfix/virtual
+
+# 2. Add pipe service to master.cf
+cat >> /etc/postfix/master.cf <<POSTFIX_EOF
+${app}-pipe unix - n n - - pipe
+  flags=Rq user=$app argv=$install_dir/parse_mail.py
+POSTFIX_EOF
+
+# 3. Apply changes
+postmap /etc/postfix/virtual
+systemctl reload postfix
+
+ynh_print_info "Installation complete! Email: $email -> Webhook: $webhook_url"

@@ -1,0 +1,34 @@
+#!/bin/bash
+set -e
+
+source /usr/share/yunohost/helpers
+
+app=$YNH_APP_INSTANCE_NAME
+install_dir="/opt/$app"
+
+# Ensure dependencies
+ynh_install_app_dependencies python3-requests
+
+# Update parse_mail.py from packaging directory
+cp "../conf/parse_mail.py" "$install_dir/parse_mail.py"
+chmod +x "$install_dir/parse_mail.py"
+chown $app:$app "$install_dir/parse_mail.py"
+
+# Regenerate config.json from settings
+domain=$(ynh_app_setting_get $app domain)
+local_part=$(ynh_app_setting_get $app local_part)
+webhook_url=$(ynh_app_setting_get $app webhook_url)
+api_secret=$(ynh_app_setting_get $app api_secret)
+parse_attachments=$(ynh_app_setting_get $app parse_attachments)
+
+cat > "$install_dir/config.json" <<JSON
+{
+  "domain": "$domain",
+  "local_part": "$local_part",
+  "webhook_url": "$webhook_url",
+  "api_secret": "$api_secret",
+  "parse_attachments": $parse_attachments
+}
+JSON
+chmod 600 "$install_dir/config.json"
+chown $app:$app "$install_dir/config.json"

@@ -1,0 +1,41 @@
+#!/bin/bash
+set -e
+
+source /usr/share/yunohost/helpers
+
+app=$YNH_APP_INSTANCE_NAME
+webhook_url=$YNH_APP_ARG_WEBHOOK_URL
+
+# Validate reachability
+webhook_check_url="$webhook_url"
+if [[ "$webhook_url" =~ ^/ ]]; then
+    webhook_check_url="http://127.0.0.1$webhook_url"
+fi
+
+ynh_print_info "Validating webhook reachability..."
+if ! curl -s -o /dev/null --max-time 5 "$webhook_check_url"; then
+    ynh_print_warn "Could not reach webhook at $webhook_check_url. Please verify the URL."
+fi
+
+ynh_app_setting_set $app webhook_url "$webhook_url"
+
+# Update config.json
+install_dir="/opt/$app"
+domain=$(ynh_app_setting_get $app domain)
+local_part=$(ynh_app_setting_get $app local_part)
+api_secret=$(ynh_app_setting_get $app api_secret)
+parse_attachments=$(ynh_app_setting_get $app parse_attachments)
+
+cat > "$install_dir/config.json" <<JSON
+{
+  "domain": "$domain",
+  "local_part": "$local_part",
+  "webhook_url": "$webhook_url",
+  "api_secret": "$api_secret",
+  "parse_attachments": $parse_attachments
+}
+JSON
+chmod 600 "$install_dir/config.json"
+chown $app:$app "$install_dir/config.json"
+
+ynh_print_info "Webhook URL updated to $webhook_url"

@@ -1,0 +1,18 @@
+#!/bin/bash
+set -e
+
+source /usr/share/yunohost/helpers
+
+app=$YNH_APP_INSTANCE_NAME
+
+# Remove from virtual (suppress error if not found)
+sed -i "/\s${app}-pipe$/d" /etc/postfix/virtual || true
+
+# Remove from master.cf (suppress error if not found)
+sed -i "/^${app}-pipe .*/,+1d" /etc/postfix/master.cf || true
+
+postmap /etc/postfix/virtual
+systemctl reload postfix
+
+ynh_system_user_delete $app || true
+rm -rf /opt/$app

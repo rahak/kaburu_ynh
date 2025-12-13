@@ -1,0 +1,51 @@
+packaging_format = 2
+id = "kaburu_api"
+name = "Kaburu"
+description.en = "Receive inbound email and forward to webhook"
+
+version = "1.0~ynh1"
+
+maintainers = ["rahak"]
+
+[upstream]
+license = "free"
+code = "https://github.com/rahak/kaburu.git"
+
+[install]
+domain = { type = "domain" }
+
+local_part = {
+    type = "string",
+    default = "inbound",
+    pattern = "^[a-z0-9._+-]+$",
+    example = "inbound",
+    ask = { en = "Email local part" }
+}
+
+webhook_url = {
+    type = "string",
+    example = "https://example.com/webhook",
+    pattern = "^(/|https?://).*",
+    ask = { en = "Webhook URL (absolute or relative)" }
+}
+
+api_secret = {
+    type = "password",
+    ask = { en = "API Secret for HMAC signature" }
+}
+
+parse_attachments = {
+    type = "boolean",
+    default = true,
+    ask = { en = "Parse and forward attachments?" }
+}
+
+[resources.system_user]
+
+[actions.change_webhook_url]
+name = "Change Webhook URL"
+arguments.webhook_url = { type = "string", pattern = "^(/|https?://).*" }
+
+[actions.change_parse_attachments]
+name = "Toggle Attachment Parsing"
+arguments.parse_attachments = { type = "boolean" }

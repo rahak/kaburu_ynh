@@ -1,0 +1,32 @@
+#!/bin/bash
+set -e
+
+source /usr/share/yunohost/helpers
+
+app=$YNH_APP_INSTANCE_NAME
+
+# Restore app directory
+ynh_restore_file --origin_path="/opt/$app"
+
+# Recreate system user
+ynh_system_user_create --username=$app --home_dir="/opt/$app"
+chown -R $app:$app /opt/$app
+
+# Recreate Postfix configuration
+domain=$(ynh_app_setting_get $app domain)
+local_part=$(ynh_app_setting_get $app local_part)
+email="${local_part}@${domain}"
+install_dir="/opt/$app"
+
+# Add virtual alias
+echo "$email  ${app}-pipe" >> /etc/postfix/virtual
+
+# Add pipe service to master.cf
+cat >> /etc/postfix/master.cf <<POSTFIX_EOF
+${app}-pipe unix - n n - - pipe
+  flags=Rq user=$app argv=$install_dir/parse_mail.py
+POSTFIX_EOF
+
+# Apply changes
+postmap /etc/postfix/virtual
+systemctl reload postfix
