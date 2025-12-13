@@ -1,0 +1,30 @@
+#!/bin/bash
+
+set -e
+
+# This hook is called during postfix configuration regeneration
+# It adds the kaburu pipe service to master.cf
+
+app="kaburu"
+install_dir="/opt/$app"
+
+# Exit if app is not installed or directory doesn't exist
+if [ ! -d "$install_dir" ]; then
+    exit 0
+fi
+
+# The hook receives the postfix config file as argument
+# For master.cf modifications, we append to the file
+if [ "${1:-}" = "post" ]; then
+    # Only add if not already present
+    if ! grep -q "^${app}-pipe unix" /etc/postfix/master.cf; then
+        cat >> /etc/postfix/master.cf <<EOF
+
+# Kaburu email webhook pipe
+${app}-pipe unix - n n - - pipe
+  flags=Rq user=$app argv=$install_dir/parse_mail.py
+EOF
+    fi
+fi
+
+exit 0
