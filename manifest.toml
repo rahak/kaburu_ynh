@@ -1,51 +1,76 @@
 packaging_format = 2
-id = "kaburu_api"
+
+id = "kaburu"
 name = "Kaburu"
-description.en = "Receive inbound email and forward to webhook"
+description.en = "Inbound email webhook forwarder with attachment parsing"
 
 version = "1.0~ynh1"
 
-maintainers = ["rahak"]
+maintainers = []
 
 [upstream]
 license = "free"
-code = "https://github.com/rahak/kaburu_ynh"
+website = "https://github.com/rahak/kaburu"
+code = "https://github.com/rahak/kaburu"
+
+[integration]
+yunohost = ">= 11.2"
+architectures = "all"
+multi_instance = true
+ldap = false
+sso = false
+disk = "50M"
+ram.build = "50M"
+ram.runtime = "50M"
 
 [install]
-domain = { type = "domain" }
+    [install.domain]
+    type = "domain"
+    help.en = "Domain where the email will be received"
 
-local_part = {
-    type = "string",
-    default = "inbound",
-    pattern = "^[a-z0-9._+-]+$",
-    example = "inbound",
-    ask = { en = "Email local part" }
-}
+    [install.local_part]
+    type = "string"
+    ask.en = "Email local part (before @)"
+    example = "webhook"
+    help.en = "The part before @ in your email address"
 
-webhook_url = {
-    type = "string",
-    example = "https://example.com/webhook",
-    pattern = "^(/|https?://).*",
-    ask = { en = "Webhook URL (absolute or relative)" }
-}
+    [install.webhook_url]
+    type = "string"
+    ask.en = "Webhook URL"
+    example = "https://example.com/webhook"
+    help.en = "URL where parsed emails will be sent. Can be relative (e.g., /webhook) or absolute"
 
-api_secret = {
-    type = "password",
-    ask = { en = "API Secret for HMAC signature" }
-}
+    [install.api_secret]
+    type = "string"
+    ask.en = "API Secret"
+    help.en = "Secret key for HMAC signature verification"
 
-parse_attachments = {
-    type = "boolean",
-    default = true,
-    ask = { en = "Parse and forward attachments?" }
-}
+    [install.parse_attachments]
+    type = "boolean"
+    ask.en = "Parse email attachments?"
+    default = true
+    help.en = "Whether to extract and parse email attachments"
 
-[resources.system_user]
+[resources]
+    [resources.system_user]
+    allow_email = true
 
-[actions.change_webhook_url]
-name = "Change Webhook URL"
-arguments.webhook_url = { type = "string", pattern = "^(/|https?://).*" }
+    [resources.apt]
+    packages = "python3-requests"
 
-[actions.change_parse_attachments]
-name = "Toggle Attachment Parsing"
-arguments.parse_attachments = { type = "boolean" }
+[config_panel]
+    [config_panel.main]
+    name = "Main configuration"
+
+        [config_panel.main.config]
+        name = "Configuration"
+
+            [config_panel.main.config.webhook_url]
+            ask = "Webhook URL"
+            type = "string"
+            bind = "webhook_url:/opt/__APP__/config.json"
+
+            [config_panel.main.config.parse_attachments]
+            ask = "Parse attachments"
+            type = "boolean"
+            bind = "parse_attachments:/opt/__APP__/config.json"
