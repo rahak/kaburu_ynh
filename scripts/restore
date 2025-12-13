@@ -21,12 +21,10 @@ install_dir="/opt/$app"
 # Add virtual alias
 echo "$email  ${app}-pipe" >> /etc/postfix/virtual
 
-# Add pipe service to master.cf
-cat >> /etc/postfix/master.cf <<POSTFIX_EOF
-${app}-pipe unix - n n - - pipe
-  flags=Rq user=$app argv=$install_dir/parse_mail.py
-POSTFIX_EOF
-
 # Apply changes
 postmap /etc/postfix/virtual
+
+# Trigger conf_regen to add to master.cf
+yunohost tools regen-conf postfix --force
+
 systemctl reload postfix
