@@ -23,9 +23,9 @@ ynh_app_setting_set $app imap_password "$imap_password"
 
 # Create YunoHost user for email
 if yunohost user list --output-as json | jq -e ".users.\"$local_part\"" >/dev/null 2>&1; then
-    yunohost user update "$local_part" --change-password "$imap_password"
+    echo "$imap_password" | yunohost user update "$local_part" --change-password
 else
-    yunohost user create "$local_part" --fullname "Kaburu Webhook" --mail "$email" <<< "$imap_password"
+    echo "$imap_password" | yunohost user create "$local_part" --fullname "Kaburu Webhook" --mail "$email" -p
 fi
 
 # Setup app directory
