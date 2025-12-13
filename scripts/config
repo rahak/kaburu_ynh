@@ -29,7 +29,12 @@ get__webhook_url() {
 }
 
 get__parse_attachments() {
-    cat "$install_dir/config.json" | python3 -c "import sys, json; print(json.load(sys.stdin)['parse_attachments'])"
+    parse_val=$(cat "$install_dir/config.json" | python3 -c "import sys, json; print(json.load(sys.stdin)['parse_attachments'])")
+    if [ "$parse_val" = "True" ] || [ "$parse_val" = "true" ] || [ "$parse_val" = "1" ]; then
+        echo "true"
+    else
+        echo "false"
+    fi
 }
 
 get__local_part() {
@@ -80,7 +85,14 @@ JSON
 }
 
 set__parse_attachments() {
-    parse_attachments="$1"
+    local parse_attachments="$1"
+    
+    # Convert string boolean to integer for config.json
+    if [ "$parse_attachments" = "true" ]; then
+        parse_attachments=1
+    else
+        parse_attachments=0
+    fi
     
     ynh_app_setting_set --app=$app --key=parse_attachments --value="$parse_attachments"
     

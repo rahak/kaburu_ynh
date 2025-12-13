@@ -58,6 +58,10 @@ ram.runtime = "50M"
     [resources.apt]
     packages = "python3-requests"
 
+    [resources.system_files]
+    "/etc/postfix/master.cf" = "w"
+    "/etc/postfix/virtual" = "w"
+
 [config_panel.settings]
 version = "1.0"
 
