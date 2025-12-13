@@ -41,10 +41,15 @@ ynh_app_setting_set $app imap_password "$imap_password"
 
 # Create YunoHost user for email receiving
 ynh_print_info "Creating email user..."
-yunohost user create "$local_part" \
-    --firstname "Kaburu" \
-    --lastname "Webhook" \
-    --mail "$email" \
+yunohost user create "$local_part" -f Kaburu -l Webhook -m "$email" -d "$domain" -p "$imap_password" || true
+
+install_dir="/opt/$app"
+mkdir -p "$install_dir"/{data,logs}
+
+# Copy parse_mail.py from packaging directory
+cp "../conf/parse_mail.py" "$install_dir/parse_mail.py"
+chmod +x "$install_dir/parse_mail.py"
+
 # Generate config.json for the python script
 cat > "$install_dir/config.json" <<JSON
 {
