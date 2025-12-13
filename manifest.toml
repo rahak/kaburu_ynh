@@ -2,7 +2,7 @@ packaging_format = 2
 
 id = "kaburu"
 name = "Kaburu"
-description.en = "Inbound email webhook forwarder with attachment parsing"
+description.en = "IMAP email → webhook forwarder (YunoHost-compatible proof-of-concept)"
 
 version = "1.0~ynh1"
 
@@ -10,8 +10,8 @@ maintainers = []
 
 [upstream]
 license = "free"
-website = "https://github.com/rahak/kaburu"
-code = "https://github.com/rahak/kaburu"
+website = "https://github.com/rahak/kaburu_ynh"
+code = "https://github.com/rahak/kaburu_ynh"
 
 [integration]
 yunohost = ">= 11.2"
@@ -26,30 +26,26 @@ ram.runtime = "50M"
 [install]
     [install.domain]
     type = "domain"
-    help.en = "Domain where the email will be received"
+    help.en = "Domain for the email address"
 
     [install.local_part]
     type = "string"
-    ask.en = "Email local part (before @)"
+    ask.en = "Email local part (username before @)"
     example = "webhook"
-    help.en = "The part before @ in your email address"
 
     [install.webhook_url]
     type = "string"
     ask.en = "Webhook URL"
     example = "https://example.com/webhook"
-    help.en = "URL where parsed emails will be sent. Can be relative (e.g., /webhook) or absolute"
 
     [install.api_secret]
     type = "string"
-    ask.en = "API Secret"
-    help.en = "Secret key for HMAC signature verification"
+    ask.en = "API Secret for HMAC signatures"
 
     [install.parse_attachments]
     type = "boolean"
-    ask.en = "Parse email attachments?"
+    ask.en = "Parse attachments?"
     default = true
-    help.en = "Whether to extract and parse email attachments"
 
 [resources]
     [resources.system_user]
@@ -57,35 +53,3 @@ ram.runtime = "50M"
 
     [resources.apt]
     packages = "python3-requests"
-
-[config_panel.settings]
-version = "1.0"
-
-    [config_panel.settings.main]
-    name = "Main configuration"
-    
-        [config_panel.settings.main.email]
-        name = "Email Configuration"
-        
-            [config_panel.settings.main.email.domain]
-            ask = "Domain"
-            type = "domain"
-            readonly = true
-            
-            [config_panel.settings.main.email.local_part]
-            ask = "Email local part (before @)"
-            type = "string"
-            help = "Change the email address local part"
-            
-        [config_panel.settings.main.webhook]
-        name = "Webhook Configuration"
-        
-            [config_panel.settings.main.webhook.webhook_url]
-            ask = "Webhook URL"
-            type = "string"
-            help = "URL where parsed emails will be sent"
-            
-            [config_panel.settings.main.webhook.parse_attachments]
-            ask = "Parse email attachments"
-            type = "boolean"
-            help = "Extract and parse email attachments"
