@@ -1,0 +1,41 @@
+#!/bin/bash
+set -e
+
+source /usr/share/yunohost/helpers
+
+app=$YNH_APP_INSTANCE_NAME
+old_domain=$YNH_APP_OLD_DOMAIN
+new_domain=$YNH_APP_NEW_DOMAIN
+
+# Get current settings
+local_part=$(ynh_app_setting_get $app local_part)
+old_email="${local_part}@${old_domain}"
+new_email="${local_part}@${new_domain}"
+
+# Update Postfix virtual alias
+sed -i "s|^${old_email}.*|${new_email}  ${app}-pipe|" /etc/postfix/virtual
+postmap /etc/postfix/virtual
+systemctl reload postfix
+
+# Update settings and config
+ynh_app_setting_set $app domain "$new_domain"
+
+install_dir="/opt/$app"
+webhook_url=$(ynh_app_setting_get $app webhook_url)
+api_secret=$(ynh_app_setting_get $app api_secret)
+parse_attachments=$(ynh_app_setting_get $app parse_attachments)
+
+cat > "$install_dir/config.json" <<JSON
+{
+  "domain": "$new_domain",
+  "local_part": "$local_part",
+  "webhook_url": "$webhook_url",
+  "api_secret": "$api_secret",
+  "parse_attachments": $parse_attachments
+}
+JSON
+chmod 600 "$install_dir/config.json"
+chown $app:$app "$install_dir/config.json"
+
+ynh_print_info "Domain changed from $old_domain to $new_domain"
+ynh_print_info "New email address: $new_email"

@@ -1,0 +1,147 @@
+#!/bin/bash
+set -e
+
+source /usr/share/yunohost/helpers
+
+app=$YNH_APP_INSTANCE_NAME
+install_dir="/opt/$app"
+
+#=================================================
+# RETRIEVE ARGUMENTS
+#=================================================
+
+get_key() {
+    echo "${1%%__*}"
+}
+
+get_action() {
+    echo "${1##*__}"
+}
+
+final_path=$(ynh_app_setting_get --app=$app --key=final_path)
+
+#=================================================
+# SPECIFIC GETTERS FOR TOML SHORT KEY
+#=================================================
+
+get__webhook_url() {
+    cat "$install_dir/config.json" | python3 -c "import sys, json; print(json.load(sys.stdin)['webhook_url'])"
+}
+
+get__parse_attachments() {
+    cat "$install_dir/config.json" | python3 -c "import sys, json; print(json.load(sys.stdin)['parse_attachments'])"
+}
+
+get__local_part() {
+    ynh_app_setting_get --app=$app --key=local_part
+}
+
+get__domain() {
+    ynh_app_setting_get --app=$app --key=domain
+}
+
+#=================================================
+# SPECIFIC SETTERS FOR TOML SHORT KEY
+#=================================================
+
+set__webhook_url() {
+    webhook_url="$1"
+    
+    # Validate reachability
+    webhook_check_url="$webhook_url"
+    if [[ "$webhook_url" =~ ^/ ]]; then
+        webhook_check_url="http://127.0.0.1$webhook_url"
+    fi
+
+    ynh_print_info "Validating webhook reachability..."
+    if ! curl -s -o /dev/null --max-time 5 "$webhook_check_url"; then
+        ynh_print_warn "Could not reach webhook at $webhook_check_url. Please verify the URL."
+    fi
+
+    ynh_app_setting_set --app=$app --key=webhook_url --value="$webhook_url"
+    
+    # Update config.json
+    domain=$(ynh_app_setting_get $app domain)
+    local_part=$(ynh_app_setting_get $app local_part)
+    api_secret=$(ynh_app_setting_get $app api_secret)
+    parse_attachments=$(ynh_app_setting_get $app parse_attachments)
+
+    cat > "$install_dir/config.json" <<JSON
+{
+  "domain": "$domain",
+  "local_part": "$local_part",
+  "webhook_url": "$webhook_url",
+  "api_secret": "$api_secret",
+  "parse_attachments": $parse_attachments
+}
+JSON
+    chmod 600 "$install_dir/config.json"
+    chown $app:$app "$install_dir/config.json"
+}
+
+set__parse_attachments() {
+    parse_attachments="$1"
+    
+    ynh_app_setting_set --app=$app --key=parse_attachments --value="$parse_attachments"
+    
+    # Update config.json
+    domain=$(ynh_app_setting_get $app domain)
+    local_part=$(ynh_app_setting_get $app local_part)
+    webhook_url=$(ynh_app_setting_get $app webhook_url)
+    api_secret=$(ynh_app_setting_get $app api_secret)
+
+    cat > "$install_dir/config.json" <<JSON
+{
+  "domain": "$domain",
+  "local_part": "$local_part",
+  "webhook_url": "$webhook_url",
+  "api_secret": "$api_secret",
+  "parse_attachments": $parse_attachments
+}
+JSON
+    chmod 600 "$install_dir/config.json"
+    chown $app:$app "$install_dir/config.json"
+}
+
+set__local_part() {
+    new_local_part="$1"
+    old_local_part=$(ynh_app_setting_get $app local_part)
+    domain=$(ynh_app_setting_get $app domain)
+    
+    old_email="${old_local_part}@${domain}"
+    new_email="${new_local_part}@${domain}"
+    
+    # Check if new email already exists
+    if postmap -q "$new_email" /etc/postfix/virtual >/dev/null 2>&1; then
+        ynh_die "The email address $new_email is already in use in Postfix."
+    fi
+    
+    # Update Postfix virtual alias
+    sed -i "s|^${old_email}.*|${new_email}  ${app}-pipe|" /etc/postfix/virtual
+    postmap /etc/postfix/virtual
+    systemctl reload postfix
+    
+    # Update settings
+    ynh_app_setting_set --app=$app --key=local_part --value="$new_local_part"
+    
+    # Update config.json
+    webhook_url=$(ynh_app_setting_get $app webhook_url)
+    api_secret=$(ynh_app_setting_get $app api_secret)
+    parse_attachments=$(ynh_app_setting_get $app parse_attachments)
+
+    cat > "$install_dir/config.json" <<JSON
+{
+  "domain": "$domain",
+  "local_part": "$new_local_part",
+  "webhook_url": "$webhook_url",
+  "api_secret": "$api_secret",
+  "parse_attachments": $parse_attachments
+}
+JSON
+    chmod 600 "$install_dir/config.json"
+    chown $app:$app "$install_dir/config.json"
+    
+    ynh_print_info "Email address changed from $old_email to $new_email"
+}
+
+ynh_app_config_run $1

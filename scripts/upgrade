@@ -6,10 +6,13 @@ source /usr/share/yunohost/helpers
 app=$YNH_APP_INSTANCE_NAME
 install_dir="/opt/$app"
 
+ynh_print_info "Upgrading $app..."
+
 # Ensure dependencies
 ynh_install_app_dependencies python3-requests
 
 # Update parse_mail.py from packaging directory
+ynh_print_info "Updating parse_mail.py script..."
 cp "../conf/parse_mail.py" "$install_dir/parse_mail.py"
 chmod +x "$install_dir/parse_mail.py"
 chown $app:$app "$install_dir/parse_mail.py"
@@ -32,3 +35,9 @@ cat > "$install_dir/config.json" <<JSON
 JSON
 chmod 600 "$install_dir/config.json"
 chown $app:$app "$install_dir/config.json"
+
+# Regenerate Postfix configuration via hook
+ynh_print_info "Regenerating Postfix configuration..."
+yunohost tools regen-conf postfix --force
+
+ynh_print_info "Upgrade complete!"

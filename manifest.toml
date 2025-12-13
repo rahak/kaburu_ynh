@@ -58,19 +58,34 @@ ram.runtime = "50M"
     [resources.apt]
     packages = "python3-requests"
 
-[config_panel]
-    [config_panel.main]
+[config_panel.settings]
+version = "1.0"
+
+    [config_panel.settings.main]
     name = "Main configuration"
-
-        [config_panel.main.config]
-        name = "Configuration"
-
-            [config_panel.main.config.webhook_url]
+    
+        [config_panel.settings.main.email]
+        name = "Email Configuration"
+        
+            [config_panel.settings.main.email.domain]
+            ask = "Domain"
+            type = "domain"
+            readonly = true
+            
+            [config_panel.settings.main.email.local_part]
+            ask = "Email local part (before @)"
+            type = "string"
+            help = "Change the email address local part"
+            
+        [config_panel.settings.main.webhook]
+        name = "Webhook Configuration"
+        
+            [config_panel.settings.main.webhook.webhook_url]
             ask = "Webhook URL"
             type = "string"
-            bind = "webhook_url:/opt/__APP__/config.json"
-
-            [config_panel.main.config.parse_attachments]
-            ask = "Parse attachments"
+            help = "URL where parsed emails will be sent"
+            
+            [config_panel.settings.main.webhook.parse_attachments]
+            ask = "Parse email attachments"
             type = "boolean"
-            bind = "parse_attachments:/opt/__APP__/config.json"
+            help = "Extract and parse email attachments"
