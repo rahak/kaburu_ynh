@@ -66,16 +66,6 @@ cat > "$install_dir/config.json" <<JSON
   "imap_password": "$imap_password"
 }
 JSON
-chmod 600 "$install_dir/config.json"unoHost
-cat > "$install_dir/config.json" <<JSON
-{
-  "domain": "$domain",
-  "local_part": "$local_part",
-  "webhook_url": "$webhook_url",
-  "api_secret": "$api_secret",
-  "parse_attachments": $parse_attachments
-}
-JSON
 chmod 600 "$install_dir/config.json"
 
 chown -R $app:$app "$install_dir"
