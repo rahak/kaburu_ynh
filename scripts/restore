@@ -20,7 +20,7 @@ install_dir="/opt/$app"
 imap_password=$(ynh_app_setting_get $app imap_password)
 
 # Recreate YunoHost user
-echo "$imap_password" | yunohost user create "$local_part" --fullname "Kaburu Webhook" --mail "$email" --password || true
+yunohost user create "$local_part" --fullname "Kaburu Webhook" --mail "$email" --password "$imap_password" || true
 
 # Recreate cron job
 cat > "/etc/cron.d/${app}" <<CRON
