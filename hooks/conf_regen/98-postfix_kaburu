@@ -1,0 +1,23 @@
+#!/bin/bash
+
+set -e
+
+app="kaburu"
+
+# Only add if app is installed
+if ! yunohost app list --output-as json | jq -e ".apps[] | select(.id==\"$app\")" >/dev/null 2>&1; then
+    exit 0
+fi
+
+install_dir="/opt/$app"
+if [ ! -d "$install_dir" ]; then
+    exit 0
+fi
+
+# Append to master.cf if not already present
+if ! grep -q "^${app}-pipe unix" /etc/postfix/master.cf; then
+    cat >> /etc/postfix/master.cf <<EOF
+${app}-pipe unix - n n - - pipe
+  flags=Rq user=$app argv=$install_dir/parse_mail.py
+EOF
+fi
