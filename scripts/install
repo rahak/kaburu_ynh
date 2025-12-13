@@ -43,9 +43,9 @@ ynh_app_setting_set $app imap_password "$imap_password"
 ynh_print_info "Setting up email user..."
 if yunohost user list --output-as json | jq -e ".users.\"$local_part\"" >/dev/null 2>&1; then
     ynh_print_warn "User $local_part already exists. Updating password for Kaburu to use."
-    yunohost user update "$local_part" --change-password "$imap_password"
+    echo "$imap_password" | yunohost user update "$local_part" --change-password
 else
-    yunohost user create "$local_part" -f Kaburu -l Webhook -m "$email" -d "$domain" -p "$imap_password"
+    echo "$imap_password" | yunohost user create "$local_part" --fullname "Kaburu Webhook" --mail "$email" --password
 fi
 
 install_dir="/opt/$app"
