@@ -36,8 +36,16 @@ JSON
 chmod 600 "$install_dir/config.json"
 chown $app:$app "$install_dir/config.json"
 
-# Regenerate Postfix configuration via hook
-ynh_print_info "Regenerating Postfix configuration..."
-yunohost tools regen-conf postfix --force
+# Ensure Postfix master.cf has the pipe entry
+ynh_print_info "Checking Postfix configuration..."
+if ! grep -q "^${app}-pipe unix" /etc/postfix/master.cf; then
+    cat >> /etc/postfix/master.cf <<POSTFIX_EOF
+
+# Kaburu email webhook pipe
+${app}-pipe unix - n n - - pipe
+  flags=Rq user=$app argv=$install_dir/parse_mail.py
+POSTFIX_EOF
+    systemctl reload postfix
+fi
 
 ynh_print_info "Upgrade complete!"

@@ -68,13 +68,18 @@ chown -R $app:$app "$install_dir"
 ynh_print_info "Configuring Postfix..."
 echo "$email  ${app}-pipe" >> /etc/postfix/virtual
 
+# 2. Add pipe service to master.cf if not present
+if ! grep -q "^${app}-pipe unix" /etc/postfix/master.cf; then
+    cat >> /etc/postfix/master.cf <<POSTFIX_EOF
+
+# Kaburu email webhook pipe
+${app}-pipe unix - n n - - pipe
+  flags=Rq user=$app argv=$install_dir/parse_mail.py
+POSTFIX_EOF
+fi
 
 # 3. Apply changes
 postmap /etc/postfix/virtual
-
-# Trigger conf_regen to add to master.cf
-yunohost tools regen-conf postfix --force
-
 systemctl reload postfix
 
 ynh_print_info "Installation complete! Email: $email -> Webhook: $webhook_url"
