@@ -7,10 +7,12 @@ app=$YNH_APP_INSTANCE_NAME
 email="${local_part}@${domain}"
 imap_password=$(ynh_string_random --length=32)
 
+ynh_print_info "Installing Kaburu email→webhook forwarder..."
+
 # Install dependencies
 ynh_install_app_dependencies python3-requests
 
-# Create system user
+# Create system user for the app
 ynh_system_user_create --username=$app --home_dir="/opt/$app"
 
 # Save settings
@@ -21,17 +23,22 @@ ynh_app_setting_set $app api_secret "$api_secret"
 ynh_app_setting_set $app parse_attachments "$parse_attachments"
 ynh_app_setting_set $app imap_password "$imap_password"
 
-# Create YunoHost user for email
+# Create YunoHost mailbox user (the key to everything!)
+ynh_print_info "Creating mailbox user: $email"
+
 if yunohost user list --output-as json | jq -e ".users.\"$local_part\"" >/dev/null 2>&1; then
-  # User exists, just update password
+  ynh_print_info "User $local_part already exists, updating password..."
   yunohost user update "$local_part" --change-password "$imap_password"
 else
-  # Create new user - proper syntax without flags
-  echo "$imap_password" | yunohost user create "$local_part" \
+  # Create real YunoHost user with mailbox
+  # This makes Postfix/Dovecot accept and deliver mail normally
+  yunohost user create "$local_part" \
+    --domain "$domain" \
     --firstname "Kaburu" \
     --lastname "Webhook" \
     --mail "$email" \
-    --password
+    --password "$imap_password" \
+    --mailbox-quota 0
 fi
 
 # Setup app directory
@@ -54,9 +61,25 @@ JSON
 chmod 600 "$install_dir/config.json"
 chown -R $app:$app "$install_dir"
 
-# Setup cron job (check every minute)
+# Create empty processed UIDs file
+echo "[]" > "$install_dir/processed_uids.json"
+chown $app:$app "$install_dir/processed_uids.json"
+
+# Setup cron job to poll IMAP every minute
 cat > "/etc/cron.d/${app}" <<CRON
-* * * * * $app $install_dir/parse_mail.py >> $install_dir/logs/cron.log 2>&1
+# Kaburu: Poll IMAP mailbox and forward to webhook
+* * * * * $app cd $install_dir && ./parse_mail.py >> logs/cron.log 2>&1
 CRON
 
-ynh_print_info "✅ Installed! Email: $email -> Webhook: $webhook_url"
+ynh_print_info "✅ Installation complete!"
+ynh_print_info ""
+ynh_print_info "📧 Mailbox created: $email"
+ynh_print_info "🔗 Webhook target: $webhook_url"
+ynh_print_info "📊 Logs: $install_dir/logs/cron.log"
+ynh_print_info ""
+ynh_print_info "How it works:"
+ynh_print_info "  1. Emails sent to $email are delivered normally by Postfix"
+ynh_print_info "  2. Dovecot stores them in the user's mailbox"
+ynh_print_info "  3. Kaburu polls via IMAP every minute"
+ynh_print_info "  4. Processed emails are forwarded to your webhook"
+ynh_print_info "  5. Successfully processed emails are deleted"
