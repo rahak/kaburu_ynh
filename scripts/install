@@ -28,17 +28,15 @@ ynh_print_info "Creating mailbox user: $email"
 
 if yunohost user list --output-as json | jq -e ".users.\"$local_part\"" >/dev/null 2>&1; then
   ynh_print_info "User $local_part already exists, updating password..."
-  echo "$imap_password" | yunohost user update "$local_part" --change-password
+  yunohost user update "$local_part" --password "$imap_password"
 else
-  # Create real YunoHost user with mailbox
-  # This makes Postfix/Dovecot accept and deliver mail normally
   ynh_print_info "Creating new user: $local_part"
-  echo "$imap_password" | yunohost user create "$local_part" \
+  yunohost user create "$local_part" \
     --domain "$domain" \
     --firstname "Kaburu" \
     --lastname "Webhook" \
     --mail "$email" \
-    --password \
+    --password "$imap_password" \
     --mailbox-quota 0
 fi
 
