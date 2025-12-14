@@ -31,13 +31,12 @@ if yunohost user list --output-as json | jq -e ".users.\"$local_part\"" >/dev/nu
   yunohost user update "$local_part" --password "$imap_password"
 else
   ynh_print_info "Creating new user: $local_part"
-  yunohost user create "$local_part" \
-    --domain "$domain" \
-    --firstname "Kaburu" \
-    --lastname "Webhook" \
-    --mail "$email" \
+  yunohost user create doorsery \
+    --domain lib.domain3.tld \
+    --mail *****@lib.domain3.tld \
     --password "$imap_password" \
     --mailbox-quota 0
+
 fi
 
 # Setup app directory
