@@ -19,8 +19,14 @@ email="${local_part}@${domain}"
 install_dir="/opt/$app"
 imap_password=$(ynh_app_setting_get $app imap_password)
 
-# Recreate YunoHost user (non-interactive)
-yunohost user create "$local_part" --fullname "Kaburu Webhook" --mail "$email" --password "$imap_password" || true
+# Recreate YunoHost user
+if ! yunohost user list --output-as json | jq -e ".users.\"$local_part\"" >/dev/null 2>&1; then
+  echo "$imap_password" | yunohost user create "$local_part" \
+    --firstname "Kaburu" \
+    --lastname "Webhook" \
+    --mail "$email" \
+    --password
+fi
 
 # Recreate cron job
 cat > "/etc/cron.d/${app}" <<CRON
