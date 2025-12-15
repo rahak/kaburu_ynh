@@ -27,8 +27,7 @@ ynh_print_info "Recreating mailbox: $email"
 if ! yunohost user list --output-as json | jq -e ".users.\"$local_part\"" >/dev/null 2>&1; then
   yunohost user create "$local_part" \
     --domain "$domain" \
-    --firstname "Kaburu" \
-    --lastname "Webhook" \
+    --fullname "Kaburu Webhook" \
     --mail "$email" \
     --password "$imap_password" \
     --mailbox-quota 0

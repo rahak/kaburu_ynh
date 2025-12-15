@@ -31,10 +31,10 @@ if yunohost user list --output-as json | jq -e ".users.\"$local_part\"" >/dev/nu
   yunohost user update "$local_part" --change-password "$imap_password"
 else
   ynh_print_info "Creating new user: $local_part"
+  # YunoHost user create syntax: username, then options
   yunohost user create "$local_part" \
     --domain "$domain" \
-    --firstname "Kaburu" \
-    --lastname "Webhook" \
+    --fullname "Kaburu Webhook" \
     --mail "$email" \
     --password "$imap_password" \
     --mailbox-quota 0
@@ -53,7 +53,7 @@ cat > "$install_dir/config.json" <<JSON
   "local_part": "$local_part",
   "webhook_url": "$webhook_url",
   "api_secret": "$api_secret",
-  "parse_attachments": $([ "$parse_attachments" = "true" ] && echo "true" || echo "false"),
+  "parse_attachments": $([ "$parse_attachments" = "true" ] || [ "$parse_attachments" = "1" ] && echo "true" || echo "false"),
   "imap_password": "$imap_password"
 }
 JSON
