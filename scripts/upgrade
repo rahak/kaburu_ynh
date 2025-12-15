@@ -6,18 +6,33 @@ source /usr/share/yunohost/helpers
 app=$YNH_APP_INSTANCE_NAME
 install_dir="/opt/$app"
 
-# Update script
-cp "../conf/parse_mail.py" "$install_dir/parse_mail.py"
-chmod +x "$install_dir/parse_mail.py"
-chown $app:$app "$install_dir/parse_mail.py"
+ynh_print_info "Upgrading Kaburu..."
 
-# Regenerate config
-domain=$(ynh_app_setting_get $app domain)
-local_part=$(ynh_app_setting_get $app local_part)
-webhook_url=$(ynh_app_setting_get $app webhook_url)
-api_secret=$(ynh_app_setting_get $app api_secret)
-parse_attachments=$(ynh_app_setting_get $app parse_attachments)
-imap_password=$(ynh_app_setting_get $app imap_password)
+#=================================================
+# UPDATE APPLICATION CODE
+#=================================================
+ynh_backup_before_upgrade
+
+cp "../conf/parse_mail.py" "$install_dir/parse_mail.py"
+chmod 750 "$install_dir/parse_mail.py"
+chown "$app:$app" "$install_dir/parse_mail.py"
+
+#=================================================
+# REGENERATE CONFIG FILE
+#=================================================
+domain=$(ynh_app_setting_get "$app" domain)
+local_part=$(ynh_app_setting_get "$app" local_part)
+webhook_url=$(ynh_app_setting_get "$app" webhook_url)
+api_secret=$(ynh_app_setting_get "$app" api_secret)
+parse_attachments=$(ynh_app_setting_get "$app" parse_attachments)
+imap_password=$(ynh_app_setting_get "$app" imap_password)
+
+# Normalize boolean for JSON
+if [ "$parse_attachments" = "1" ] || [ "$parse_attachments" = "true" ]; then
+  parse_attachments="true"
+else
+  parse_attachments="false"
+fi
 
 cat > "$install_dir/config.json" <<JSON
 {
@@ -29,7 +44,18 @@ cat > "$install_dir/config.json" <<JSON
   "imap_password": "$imap_password"
 }
 JSON
-chmod 600 "$install_dir/config.json"
-chown $app:$app "$install_dir/config.json"
 
-ynh_print_info "✅ Upgraded!"
+chmod 600 "$install_dir/config.json"
+chown "$app:$app" "$install_dir/config.json"
+
+#=================================================
+# ENSURE CRON EXISTS (DO NOT OVERWRITE)
+#=================================================
+if [ ! -f "/etc/cron.d/$app" ]; then
+  cat > "/etc/cron.d/$app" <<CRON
+# Kaburu: Poll IMAP mailbox and forward to webhook
+* * * * * $app cd $install_dir && ./parse_mail.py >> $install_dir/logs/cron.log 2>&1
+CRON
+fi
+
+ynh_print_info "✅ Upgrade complete"

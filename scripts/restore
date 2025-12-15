@@ -4,36 +4,34 @@ set -e
 source /usr/share/yunohost/helpers
 
 app=$YNH_APP_INSTANCE_NAME
+install_dir="/opt/$app"
 
 ynh_print_info "Restoring Kaburu..."
 
-# Restore app directory
-ynh_restore_file --origin_path="/opt/$app"
+#=================================================
+# RESTORE APP DIRECTORY
+#=================================================
+ynh_restore_file --origin_path="$install_dir"
 
-# Recreate system user
-ynh_system_user_create --username=$app --home_dir="/opt/$app"
-chown -R $app:$app /opt/$app
+#=================================================
+# RECREATE SYSTEM USER (NO MAILBOX)
+#=================================================
+ynh_system_user_create --username="$app" --home_dir="$install_dir"
+chown -R "$app:$app" "$install_dir"
 
-# Get saved settings
-domain=$(ynh_app_setting_get $app domain)
-local_part=$(ynh_app_setting_get $app local_part)
+#=================================================
+# RESTORE CRON JOB
+#=================================================
+ynh_restore_file --origin_path="/etc/cron.d/$app"
+
+#=================================================
+# FINAL MESSAGE
+#=================================================
+domain=$(ynh_app_setting_get "$app" domain)
+local_part=$(ynh_app_setting_get "$app" local_part)
 email="${local_part}@${domain}"
-install_dir="/opt/$app"
-imap_password=$(ynh_app_setting_get $app imap_password)
 
-# Recreate YunoHost mailbox user
-ynh_print_info "Recreating mailbox: $email"
-
-if ! yunohost user list --output-as json | jq -e ".users.\"$local_part\"" >/dev/null 2>&1; then
-  yunohost user create "$local_part" \
-    --domain "$domain" \
-    --fullname "Kaburu Webhook" \
-    --mail "$email" \
-    --password "$imap_password" \
-    --mailbox-quota 0
-fi
-
-# Restore cron job
-ynh_restore_file --origin_path="/etc/cron.d/${app}"
-
-ynh_print_info "✅ Restore complete!"
+ynh_print_info "✅ Restore complete"
+ynh_print_info "📧 Using existing mailbox: $email"
+ynh_print_info "⏰ Cron restored"
+ynh_print_info "📂 App directory restored: $install_dir"

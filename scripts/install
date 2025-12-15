@@ -1,53 +1,69 @@
 #!/bin/bash
 set -e
 
+#=================================================
+# COMMON VARIABLES & HELPERS
+#=================================================
 source /usr/share/yunohost/helpers
 
 app=$YNH_APP_INSTANCE_NAME
+install_dir="/opt/$app"
+
 email="${local_part}@${domain}"
-imap_password=$(ynh_string_random --length=32)
 
-ynh_print_info "Installing Kaburu email→webhook forwarder..."
+#=================================================
+# CHECKS
+#=================================================
+ynh_print_info "Installing Kaburu (email → webhook forwarder)"
 
-# Install dependencies
-ynh_install_app_dependencies python3-requests
-
-# Create system user for the app
-ynh_system_user_create --username=$app --home_dir="/opt/$app"
-
-# Save settings
-ynh_app_setting_set $app domain "$domain"
-ynh_app_setting_set $app local_part "$local_part"
-ynh_app_setting_set $app webhook_url "$webhook_url"
-ynh_app_setting_set $app api_secret "$api_secret"
-ynh_app_setting_set $app parse_attachments "$parse_attachments"
-ynh_app_setting_set $app imap_password "$imap_password"
-
-# Create YunoHost mailbox user (the key to everything!)
-ynh_print_info "Creating mailbox user: $email"
-
-if yunohost user list --output-as json | jq -e ".users.\"$local_part\"" >/dev/null 2>&1; then
-  ynh_print_info "User $local_part already exists, updating password..."
-  yunohost user update "$local_part" --change-password "$imap_password"
-else
-  ynh_print_info "Creating new user: $local_part"
-  # YunoHost user create syntax: username, then options
-  yunohost user create "$local_part" \
-    --domain "$domain" \
-    --fullname "Kaburu Webhook" \
-    --mail "$email" \
-    --password "$imap_password" \
-    --mailbox-quota 0
+# Ensure required arguments exist
+if [[ -z "$domain" || -z "$local_part" || -z "$imap_password" || -z "$webhook_url" ]]; then
+  ynh_die "Missing required install parameters"
 fi
 
-# Setup app directory
-install_dir="/opt/$app"
-mkdir -p "$install_dir"/{data,logs}
-cp "../conf/parse_mail.py" "$install_dir/parse_mail.py"
-chmod +x "$install_dir/parse_mail.py"
+#=================================================
+# DEPENDENCIES
+#=================================================
+ynh_print_info "Installing dependencies"
+ynh_install_app_dependencies python3-requests jq
 
-# Create config file with proper boolean value
-cat > "$install_dir/config.json" <<JSON
+#=================================================
+# SYSTEM USER
+#=================================================
+ynh_print_info "Creating system user"
+ynh_system_user_create \
+  --username="$app" \
+  --home_dir="$install_dir" \
+  --shell=/usr/sbin/nologin
+
+#=================================================
+# SAVE SETTINGS
+#=================================================
+ynh_print_info "Saving app settings"
+
+ynh_app_setting_set "$app" domain "$domain"
+ynh_app_setting_set "$app" local_part "$local_part"
+ynh_app_setting_set "$app" webhook_url "$webhook_url"
+ynh_app_setting_set "$app" api_secret "$api_secret"
+ynh_app_setting_set "$app" parse_attachments "$parse_attachments"
+ynh_app_setting_set "$app" imap_password "$imap_password"
+
+#=================================================
+# INSTALL FILES
+#=================================================
+ynh_print_info "Installing application files"
+
+mkdir -p "$install_dir"/{data,logs}
+
+cp ../conf/parse_mail.py "$install_dir/parse_mail.py"
+chmod 750 "$install_dir/parse_mail.py"
+
+#=================================================
+# CONFIG FILE
+#=================================================
+ynh_print_info "Creating config.json"
+
+cat > "$install_dir/config.json" <<EOF
 {
   "domain": "$domain",
   "local_part": "$local_part",
@@ -56,30 +72,46 @@ cat > "$install_dir/config.json" <<JSON
   "parse_attachments": $([ "$parse_attachments" = "true" ] || [ "$parse_attachments" = "1" ] && echo "true" || echo "false"),
   "imap_password": "$imap_password"
 }
-JSON
+EOF
 
 chmod 600 "$install_dir/config.json"
-chown -R $app:$app "$install_dir"
 
-# Create empty processed UIDs file
+#=================================================
+# STATE FILES
+#=================================================
 echo "[]" > "$install_dir/processed_uids.json"
-chown $app:$app "$install_dir/processed_uids.json"
+chmod 600 "$install_dir/processed_uids.json"
 
-# Setup cron job to poll IMAP every minute
-cat > "/etc/cron.d/${app}" <<CRON
+#=================================================
+# OWNERSHIP
+#=================================================
+chown -R "$app:$app" "$install_dir"
+
+#=================================================
+# CRON JOB
+#=================================================
+ynh_print_info "Setting up cron job"
+
+cat > "/etc/cron.d/$app" <<EOF
 # Kaburu: Poll IMAP mailbox and forward to webhook
 * * * * * $app cd $install_dir && ./parse_mail.py >> $install_dir/logs/cron.log 2>&1
-CRON
+EOF
 
-ynh_print_info "✅ Installation complete!"
+chmod 644 "/etc/cron.d/$app"
+
+#=================================================
+# FINAL MESSAGE
+#=================================================
+ynh_print_info "✅ Kaburu installed successfully"
 ynh_print_info ""
-ynh_print_info "📧 Mailbox created: $email"
-ynh_print_info "🔗 Webhook target: $webhook_url"
+ynh_print_info "📧 Listening mailbox: $email"
+ynh_print_info "🔐 IMAP password: (stored securely)"
+ynh_print_info "🔗 Webhook: $webhook_url"
 ynh_print_info "📊 Logs: $install_dir/logs/cron.log"
 ynh_print_info ""
-ynh_print_info "How it works:"
-ynh_print_info "  1. Emails sent to $email are delivered normally by Postfix"
-ynh_print_info "  2. Dovecot stores them in the user's mailbox"
-ynh_print_info "  3. Kaburu polls via IMAP every minute"
-ynh_print_info "  4. Processed emails are forwarded to your webhook"
-ynh_print_info "  5. Successfully processed emails are deleted"
+ynh_print_info "⚠ IMPORTANT:"
+ynh_print_info "• The mailbox $email MUST already exist"
+ynh_print_info "• IMAP must be enabled for that user"
+ynh_print_info ""
+ynh_print_info "Test:"
+ynh_print_info "  echo 'Test' | mail -s 'Test' $email"

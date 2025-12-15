@@ -4,16 +4,39 @@ set -e
 source /usr/share/yunohost/helpers
 
 app=$YNH_APP_INSTANCE_NAME
-local_part=$(ynh_app_setting_get $app local_part)
 
-# Remove cron job
+ynh_print_info "Removing Kaburu..."
+
+#=================================================
+# LOAD SAVED SETTINGS
+#=================================================
+local_part=$(ynh_app_setting_get "$app" local_part || true)
+domain=$(ynh_app_setting_get "$app" domain || true)
+email="${local_part}@${domain}"
+
+#=================================================
+# REMOVE CRON JOB
+#=================================================
 rm -f "/etc/cron.d/${app}"
 
-# Delete YunoHost user
-if yunohost user list --output-as json | jq -e ".users.\"$local_part\"" >/dev/null 2>&1; then
+#=================================================
+# REMOVE MAILBOX USER (ONLY IF CREATED BY APP)
+#=================================================
+if [ -n "$local_part" ] && yunohost user list --output-as json | jq -e ".users.\"$local_part\"" >/dev/null 2>&1; then
+    ynh_print_info "Deleting mailbox user: $email"
     yunohost user delete "$local_part" || true
 fi
 
-# Delete system user and files
-ynh_system_user_delete $app || true
-rm -rf /opt/$app
+#=================================================
+# REMOVE SYSTEM USER
+#=================================================
+if ynh_system_user_exists "$app"; then
+    ynh_system_user_delete "$app" || true
+fi
+
+#=================================================
+# REMOVE APPLICATION FILES
+#=================================================
+rm -rf "/opt/$app"
+
+ynh_print_info "✅ Kaburu removed"

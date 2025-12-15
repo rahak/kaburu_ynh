@@ -2,54 +2,78 @@ packaging_format = 2
 
 id = "kaburu"
 name = "Kaburu"
-description.en = "IMAP email → webhook forwarder (YunoHost-compatible proof-of-concept)"
+description.en = "IMAP email → webhook forwarder (polls an existing mailbox)"
 
 version = "1.0~ynh1"
 
 maintainers = []
 
+#=================================================
+# UPSTREAM
+#=================================================
 [upstream]
-license = "free"
+license = "MIT"
 website = "https://github.com/rahak/kaburu_ynh"
 code = "https://github.com/rahak/kaburu_ynh"
 
+#=================================================
+# INTEGRATION
+#=================================================
 [integration]
 yunohost = ">= 11.2"
 architectures = "all"
 multi_instance = true
 ldap = false
 sso = false
+
 disk = "50M"
 ram.build = "50M"
 ram.runtime = "50M"
 
+#=================================================
+# INSTALL ARGUMENTS
+#=================================================
 [install]
+
     [install.domain]
     type = "domain"
-    help.en = "Domain for the email address"
+    help.en = "Domain of the mailbox"
 
     [install.local_part]
     type = "string"
-    ask.en = "Email local part (username before @)"
-    example = "webhook"
+    ask.en = "Mailbox local part (before @)"
+    example = "doorsery"
+
+    [install.imap_password]
+    type = "password"
+    ask.en = "IMAP password of the mailbox"
+    help.en = "Password of the existing mailbox to poll via IMAP"
 
     [install.webhook_url]
-    type = "string"
+    type = "url"
     ask.en = "Webhook URL"
-    example = "https://example.com/webhook"
+    example = "https://example.com/webhooks/email/inbound"
 
     [install.api_secret]
     type = "string"
-    ask.en = "API Secret for HMAC signatures"
+    ask.en = "API secret for HMAC signature"
+    example = "supersecretkey"
 
     [install.parse_attachments]
     type = "boolean"
-    ask.en = "Parse attachments?"
+    ask.en = "Parse email attachments?"
     default = true
 
+#=================================================
+# RESOURCES
+#=================================================
 [resources]
+
     [resources.system_user]
-    allow_email = true
+    allow_email = false
 
     [resources.apt]
-    packages = "python3-requests"
+    packages = [
+        "python3-requests",
+        "jq"
+    ]
