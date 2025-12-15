@@ -134,14 +134,21 @@ def process_email(raw):
     
     return status
 
+IMAP_HOST = cfg.get("domain") or "localhost"
+IMAP_PORT_SSL = 993
+USERNAME_LOCAL = cfg.get("local_part")
+USERNAME_EMAIL = f"{cfg.get('local_part')}@{cfg.get('domain')}"
+
 def check_imap():
     """Check IMAP mailbox for new emails"""
     processed_uids = load_processed_uids()
-    
     try:
-        # Connect to local dovecot
-        mail = imaplib.IMAP4('localhost')
-        mail.login(EMAIL_ADDR, IMAP_PASSWORD)
+        # Use SSL with the domain/FQDN to match the cert
+        mail = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT_SSL)
+        try:
+            mail.login(USERNAME_LOCAL, IMAP_PASSWORD)
+        except Exception:
+            mail.login(USERNAME_EMAIL, IMAP_PASSWORD)
         mail.select('INBOX')
         
         # Search for all emails
