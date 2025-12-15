@@ -31,10 +31,8 @@ ynh_install_app_dependencies python3-requests jq
 # SYSTEM USER
 #=================================================
 ynh_print_info "Creating system user"
-ynh_system_user_create \
-  --username="$app" \
-  --home_dir="$install_dir" \
-  --shell=/usr/sbin/nologin
+ynh_system_user_create --username="$app" --home_dir="$install_dir"
+
 
 #=================================================
 # SAVE SETTINGS
